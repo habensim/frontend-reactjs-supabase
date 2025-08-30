@@ -1,6 +1,7 @@
+// src/pages/RegistrationPage.tsx
 import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowRight, Eye, EyeOff, Mail, Lock, User, Phone, CheckCircle } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, Mail, Lock, User, Phone, CheckCircle, AlertCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -13,8 +14,7 @@ export default function RegistrationPage() {
   const redirectFromQuery =
       searchParams.get('redirect') ||
       (templateId ? `/checkout?template=${templateId}&option=${option}` : '/dashboard/website');
-  const { signUp } = useAuth();
-
+  const { signUp, signIn } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -22,26 +22,36 @@ export default function RegistrationPage() {
     whatsapp: '',
     agreement: false
   });
-
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setErrorMessage(null);
+    setSuccessMessage(null);
 
     try {
       // Ensure no stale session remains
       await supabase.auth.signOut();
 
+      // Save redirect for callback flow
+      try {
+        localStorage.setItem('postAuthRedirect', redirectFromQuery);
+        console.log('Stored redirect path:', redirectFromQuery);
 
-      // Save redirect for callback flow (email confirmations ON)
-      try { localStorage.setItem('postAuthRedirect', redirectFromQuery); } catch {}
-     // (Optional) also ensure selection persists for checkout restore
-      try { localStorage.setItem('pendingCheckout', JSON.stringify({ templateId, optionId: option })); } catch {}
-      // Make sure your custom `signUp` function from `useAuth` returns the full { data, error } object from Supabase.
+        // Also store pending checkout information
+        if (templateId) {
+          localStorage.setItem('pendingCheckout', JSON.stringify({ templateId, optionId }));
+          console.log('Stored pending checkout:', { templateId, optionId });
+        }
+      } catch (e) {
+        console.error('Failed to store redirect:', e);
+      }
+
+      // First, try to sign up the user
       const { data, error: signupError } = await signUp(
           formData.email,
           formData.password,
@@ -49,144 +59,42 @@ export default function RegistrationPage() {
           formData.whatsapp
       );
 
-      // 1) Sign up user with phone number
-      // const { error: signupError } = await signUp(
-      //   formData.email,
-      //   formData.password,
-      //   formData.namaBisnis,
-      //   formData.whatsapp
-      // );
-
       if (signupError) {
-        setErrorMessage(signupError.message);
+        // If user already exists, try to sign in instead
+        if (signupError.message.includes('already registered') ||
+            signupError.message.includes('already in use')) {
+          const { error: signInError } = await signIn(formData.email, formData.password);
+
+          if (signInError) {
+            setErrorMessage(signInError.message);
+            setIsLoading(false);
+            return;
+          }
+
+          // If sign in is successful, the redirect will be handled by AuthContext
+          return;
+        } else {
+          setErrorMessage(signupError.message);
+        }
         setIsLoading(false);
         return;
       }
-      // 2. Check the result directly instead of polling.
-      const hasSession = !!data.session;
-      const hasUser = !!data.user;
 
-      // If a user was created but there's no session, it means email confirmation is required.
-      if (hasUser && !hasSession) {
-        navigate(`/auth/verify-email?email=${encodeURIComponent(formData.email)}`);
-        return; // Exit the function
+      // Check if user was created and session exists (email confirmation disabled)
+      if (data?.user && data?.session) {
+        // Session exists, redirect will be handled by AuthContext
+        return;
+      } else if (data?.user && !data.session) {
+        // Email confirmation required
+        setSuccessMessage('Pendaftaran berhasil! Silakan periksa email Anda untuk verifikasi akun.');
+        setIsLoading(false);
+        return;
       }
-
-      // let session = null;
-      // const MAX_WAIT = 1500;
-      // const interval = 1000;
-      // let elapsed = 0;
-      //
-      // while (elapsed < MAX_WAIT) {
-      //   const { data: sessionData } = await supabase.auth.getSession();
-      //   session = sessionData.session;
-      //   if (session) break;
-      //   await new Promise((res) => setTimeout(res, interval));
-      //   elapsed += interval;
-      // }
-
-      // Check current session (might be null if email confirmation ON)
-      // const { data: sessionData } = await supabase.auth.getSession();
-      // const hasSession = !!sessionData.session;
-
-      // if (!session) {
-      //   // Route user to verify page
-      //   navigate(`/auth/verify-email?email=${encodeURIComponent(formData.email)}`);
-      //   return;
-      // }
-
-      // If we have a session, ensure it matches the newly registered email
-      // const { data: { user } } = await supabase.auth.getUser();
-      // if (!user || user.email?.toLowerCase() !== formData.email.toLowerCase())  {
-      //   // Different user still signed in; sign out and ask to verify
-      //   await supabase.auth.signOut();
-      //   navigate(`/auth/verify-email?email=${encodeURIComponent(formData.email)}`);
-      //   return;
-      // }
-      // If there IS a session, it means email confirmation is off. We can proceed.
-      if (hasUser && hasSession) {
-        const user = data.user;
-
-        // 3. Create the user profile in your 'users' table.
-        await supabase
-            .from('users')
-            .upsert({
-              id: user.id,
-              email: formData.email,
-              full_name: formData.namaBisnis,
-              phone: formData.whatsapp,
-            }, { onConflict: 'id' });
-
-        // 4. Create the associated project if a template was selected.
-        if (templateId) {
-          const { error: projectError } = await supabase
-              .from('user_projects')
-              .insert({
-                user_id: user.id,
-                name: formData.namaBisnis,
-                description: `Project untuk ${formData.namaBisnis}`,
-                template_id: templateId,
-                customizations: { platform: option, whatsapp: formData.whatsapp },
-                status: 'draft',
-              });
-
-          if (projectError) {
-            throw new Error('Gagal membuat project. Silakan coba lagi.');
-          }
-        }
-
-        // 5. Navigate to the dashboard.
-        navigate('/dashboard');
-      }
-
     } catch (err: any) {
       setErrorMessage(err?.message || 'Terjadi kesalahan, coba lagi.');
     } finally {
-      setIsLoading(false); // This will run no matter what, stopping the spinner.
+      setIsLoading(false);
     }
-    // Create profile and project for immediate sessions (confirmations OFF)
-    //   await supabase
-    //     .from('users')
-    //     .upsert({
-    //       id: user.id,
-    //       email: formData.email,
-    //       full_name: formData.namaBisnis,
-    //       phone: formData.whatsapp,
-    //       created_at: new Date().toISOString(),
-    //       updated_at: new Date().toISOString(),
-    //       is_verified: false,
-    //       subscription_tier: 'free',
-    //       last_login: new Date().toISOString()
-    //     }, { onConflict: 'id' });
-    //
-    //   if (templateId) {
-    //     const { error: projectError } = await supabase
-    //       .from('user_projects')
-    //       .insert({
-    //         user_id: user.id,
-    //         name: formData.namaBisnis,
-    //         description: `Project untuk ${formData.namaBisnis}`,
-    //         template_id: templateId,
-    //         customizations: { platform: option, whatsapp: formData.whatsapp },
-    //         status: 'draft',
-    //         created_at: new Date().toISOString(),
-    //         updated_at: new Date().toISOString()
-    //       });
-    //
-    //     if (projectError) {
-    //       console.error('Error creating user project:', projectError);
-    //       setErrorMessage('Gagal membuat project. Silakan coba lagi.');
-    //       setIsLoading(false);
-    //       return;
-    //     }
-    //   }
-    //
-    //   navigate('/dashboard');
-    // } catch (err: any) {
-    //   setErrorMessage(err?.message || 'Terjadi kesalahan, coba lagi.');
-    // } finally {
-    //   setIsLoading(false);
-    // }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -198,6 +106,13 @@ export default function RegistrationPage() {
   };
 
   const socialLogin = (provider: string) => {
+    // Store redirect for OAuth providers
+    try {
+      localStorage.setItem('postAuthRedirect', redirectFromQuery);
+      console.log('Stored redirect path for OAuth:', redirectFromQuery);
+    } catch (e) {
+      console.error('Failed to store redirect for OAuth:', e);
+    }
     navigate('/masuk');
   };
 
@@ -223,8 +138,16 @@ export default function RegistrationPage() {
             </div>
 
             {errorMessage && (
-                <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 border border-red-200">
-                  {errorMessage}
+                <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 border border-red-200 flex items-start">
+                  <AlertCircle className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
+                  <span>{errorMessage}</span>
+                </div>
+            )}
+
+            {successMessage && (
+                <div className="mb-4 p-3 rounded-lg bg-green-50 text-green-700 border border-green-200 flex items-start">
+                  <CheckCircle className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
+                  <span>{successMessage}</span>
                 </div>
             )}
 

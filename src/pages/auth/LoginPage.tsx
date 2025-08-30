@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import AuthForm from '../../components/auth/AuthForm';
@@ -9,8 +9,20 @@ export default function LoginPage() {
   const [searchParams] = useSearchParams();
   const next = searchParams.get('next') || '/dashboard';
 
+  // Store redirect path when  the component mounts
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('postAuthRedirect', next);
+      console.log('Stored redirect path in login page:', next);
+    } catch (e) {
+      console.error('Failed to store redirect path:', e);
+    }
+  }, [next])
+
   const handleSuccess = () => {
-    navigate(next);
+    // The redirect will be handled by AuthContext
+    console.log('Login successful, redirect will be handled by AuthContext');
   };
 
   return (

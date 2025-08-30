@@ -50,9 +50,44 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
-      if (session?.user) await ensureUserProfile(session.user);
-      else setUserProfile(null);
+      if (session?.user) {
+        await ensureUserProfile(session.user);
+      } else {
+        setUserProfile(null);
+      }
       setLoading(false);
+
+      // Handle redirect after authentication
+      if (_event === 'SIGNED_IN' && session) {
+        try {
+          let redirectPath = '/dashboard'; // Default fallback
+          // First try to get the stored redirect path
+          const storedRedirect = localStorage.getItem('postAuthRedirect');
+          if (storedRedirect) {
+            redirectPath = storedRedirect;
+            localStorage.removeItem('postAuthRedirect');
+            console.log('Using stored redirect path:', redirectPath);
+          }else {
+            // If no stored redirect, check for pending checkout
+            const pendingCheckout = localStorage.getItem('pendingCheckout');
+            if (pendingCheckout) {
+              const {templateId, optionId} = JSON.parse(pendingCheckout);
+              redirectPath = `/checkout?template=${templateId}&option=${optionId}`;
+              localStorage.removeItem('pendingCheckout');
+              console.log('Using pending checkout:', redirectPath);
+            }
+          }
+          console.log('Redirecting to:', redirectPath);
+
+          // Use window.location.replace for a more reliable redirect
+          window.location.replace(redirectPath);
+        } catch (e) {
+          console.error('Error handling redirect:', e);
+          // Fallback to dashboard
+          window.location.replace('/dashboard');
+        }
+      }
+
     });
 
     return () => {
