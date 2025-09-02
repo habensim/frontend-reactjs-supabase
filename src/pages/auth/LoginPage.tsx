@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import AuthForm from '../../components/auth/AuthForm';
 
 export default function LoginPage() {
   const [mode, setMode] = useState<'signin' | 'signup' | 'forgot-password'>('signin');
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const next = searchParams.get('next') || '/dashboard';
 
@@ -42,9 +41,9 @@ export default function LoginPage() {
           </p>
         </motion.div>
 
-        <AuthForm 
-          mode={mode} 
-          onModeChange={setMode} 
+        <AuthForm
+          mode={mode}
+          onModeChange={setMode}
           onSuccess={handleSuccess}
         />
       </div>

@@ -8,6 +8,7 @@ interface AuthContextType {
   userProfile: Tables<'users'> | null;
   session: Session | null;
   loading: boolean;
+  isInitialized: boolean;
   signUp: (email: string, password: string, fullName: string, phone?: string) => Promise<AuthResponse>;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signInWithGoogle: () => Promise<{ error: AuthError | null }>;
@@ -19,6 +20,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) throw new Error('useAuth must be used within an AuthProvider');
@@ -32,6 +34,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [userProfile, setUserProfile] = useState<Tables<'users'> | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+
 
   useEffect(() => {
     let mounted = true;
@@ -98,7 +101,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const ensureUserProfile = async (user: User) => {
     try {
-      const { data, error } = await supabase.from('users').select('*').eq('id', user.id).maybeSingle();
+      const { data, error } = await supabase.from('users').select('*').eq('id', user.id).single();
+
       if (error) {
         console.error('Fetch profile error', error);
         setUserProfile(null);
@@ -135,7 +139,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   const signUp = async (email: string, password: string, fullName: string, phone?: string) => {
-    const { data, error } = await supabase.auth.signUp({
+    return await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -143,62 +147,51 @@ export function AuthProvider({ children }: AuthProviderProps) {
         data: { full_name: fullName, phone: phone || '' },
       },
     });
-    return { data, error };
   };
 
   const signIn = async (email: string, password: string) => {
-    try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      return { error };
-    } catch (error) {
-      return { error: error as AuthError };
-    }
+    return await supabase.auth.signInWithPassword({ email, password });
   };
 
   const signInWithGoogle = async () => {
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: { redirectTo: `${window.location.origin}/auth/callback` },
-      });
-      return { error };
-    } catch (error) {
-      return { error: error as AuthError };
-    }
+    return await supabase.auth.signInWithOAuth({
+
+      provider: 'google',
+
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
+
+    });
   };
 
   const signInWithFacebook = async () => {
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'facebook',
-        options: { redirectTo: `${window.location.origin}/auth/callback` },
-      });
-      return { error };
-    } catch (error) {
-      return { error: error as AuthError };
-    }
+    return await supabase.auth.signInWithOAuth({
+      provider: 'facebook',
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
+    });
   };
 
   const signOut = async () => {
     try {
       await supabase.auth.signOut();
-      setSession(null);
-      setUser(null);
-      setUserProfile(null);
+      window.location.replace('/');
     } catch (error) {
       console.error('Error signing out:', error);
     }
   };
 
   const updateProfile = async (updates: Partial<Tables<'users'>>) => {
-    if (!user) return { error: { message: 'No user logged in' } as AuthError };
-    try {
-      const { error } = await supabase.from('users').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', user.id);
-      if (!error) await ensureUserProfile(user);
-      return { error: error ? ({ message: error.message } as AuthError) : null };
-    } catch (error) {
-      return { error: error as AuthError };
+    if (!user) return { data: null, error: { message: 'No user logged in' } as AuthError };
+    const { data, error } = await supabase.from('users').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', user.id).select().single();
+    if (!error && data) {
+      setUserProfile(data as Tables<'users'>);
     }
+    return { data, error };
+  };
+
+  const resetPassword = async (email: string) => {
+    return await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth/update-password`,
+    });
   };
 
   const value: AuthContextType = {
@@ -212,14 +205,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     signInWithFacebook,
     signOut,
     updateProfile,
-    resetPassword: async (email: string) => {
-      try {
-        const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/auth/callback` });
-        return { error };
-      } catch (error) {
-        return { error: error as AuthError };
-      }
-    },
+    resetPassword,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

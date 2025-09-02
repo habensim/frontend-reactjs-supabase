@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Globe, Menu, X, User, LogOut, LayoutDashboard } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -9,8 +9,6 @@ interface HeaderProps {
 }
 
 export default function Header({ isMenuOpen, setIsMenuOpen }: HeaderProps) {
-  const location = useLocation();
-  const navigate = useNavigate();
   const { user, userProfile, signOut } = useAuth();
 
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
@@ -32,7 +30,6 @@ export default function Header({ isMenuOpen, setIsMenuOpen }: HeaderProps) {
   const handleSignOut = async () => {
     await signOut();
     setIsProfileMenuOpen(false); // Close menu on logout
-    navigate('/'); // Redirect to home page
   };
 
   const closeMobileMenu = () => setIsMenuOpen(false);

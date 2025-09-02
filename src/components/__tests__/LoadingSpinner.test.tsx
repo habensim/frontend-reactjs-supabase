@@ -48,3 +48,4 @@ describe('ButtonLoader', () => {
     expect(spinner).toBeInTheDocument();
   });
 });
+

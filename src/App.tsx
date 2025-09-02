@@ -1,4 +1,4 @@
-import React, { useState, Suspense } from 'react';
+import React, {Suspense, useState} from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import ErrorBoundary from './components/ErrorBoundary';
 import { PageLoader } from './components/LoadingSpinner';
@@ -27,44 +27,44 @@ const ProfilePage = React.lazy(() => import('./pages/dashboard/ProfilePage'));
 
 function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-
   return (
     <ErrorBoundary>
-      <AuthProvider>
-        <Router>
-          <div className="min-h-screen bg-white">
-            <Header isMenuOpen={isMenuOpen} setIsMenuOpen={setIsMenuOpen} />
-            <main>
-              <Suspense fallback={<PageLoader />}>
-                <Routes>
-                  {/* Public Routes */}
-                  <Route path="/" element={<HomePage />} />
-                  <Route path="/pilih-industri" element={<IndustrySelectionPage />} />
-                  <Route path="/template/:industryId" element={<TemplateGalleryPage />} />
-                  <Route path="/template-options/:industryId" element={<TemplateOptionsPage />} />
-                  <Route path="/daftar" element={<RegistrationPage />} />
-                  <Route path="/masuk" element={<LoginPage />} />
-                  <Route path="/auth/verify-email" element={<VerifyEmailPage />} />
-                  <Route path="/auth/callback" element={<AuthCallbackPage />} />
-                  <Route path="/checkout" element={<CheckoutPage />} />
-                  <Route path="/payment-success" element={<PaymentSuccessPage />} />
-                  
-                  {/* Dashboard Routes (Protected) */}
-                  <Route path="/dashboard" element={<RequireAuth><DashboardPage /></RequireAuth>} />
-                  <Route path="/dashboard/billing" element={<RequireAuth><BillingPage /></RequireAuth>} />
-                  <Route path="/dashboard/website" element={<RequireAuth><WebsitePage /></RequireAuth>} />
-                  <Route path="/dashboard/profile" element={<RequireAuth><ProfilePage /></RequireAuth>} />
-                  
-                  {/* Placeholder routes */}
-                  <Route path="/setup/bisnis-info" element={<div className="min-h-screen flex items-center justify-center"><h1 className="text-2xl">Setup Bisnis Info</h1></div>} />
-                  <Route path="/wp-admin" element={<div className="min-h-screen flex items-center justify-center"><h1 className="text-2xl">WordPress Dashboard</h1></div>} />
-                </Routes>
-              </Suspense>
-            </main>
-            <Footer />
-          </div>
-        </Router>
-      </AuthProvider>
+      <Router>
+        <AuthProvider>
+            <div className="min-h-screen bg-white">
+              <Header isMenuOpen={isMenuOpen} setIsMenuOpen={setIsMenuOpen} />
+              <main>
+                <Suspense fallback={<PageLoader />}>
+                  <Routes>
+                    {/* Public Routes */}
+                    <Route path="/" element={<HomePage />} />
+                    <Route path="/pilih-industri" element={<IndustrySelectionPage />} />
+                    <Route path="/template/:industryId" element={<TemplateGalleryPage />} />
+                    <Route path="/template-options/:industryId" element={<TemplateOptionsPage />} />
+                    <Route path="/daftar" element={<RegistrationPage />} />
+                    <Route path="/masuk" element={<LoginPage />} />
+                    <Route path="/auth/verify-email" element={<VerifyEmailPage />} />
+                    <Route path="/auth/callback" element={<AuthCallbackPage />} />
+                    <Route path="/checkout" element={<CheckoutPage />} />
+                    <Route path="/payment-success" element={<PaymentSuccessPage />} />
+
+                    {/* Dashboard Routes (Protected) */}
+                    <Route path="/dashboard" element={<RequireAuth><DashboardPage /></RequireAuth>} />
+                    <Route path="/dashboard/billing" element={<RequireAuth><BillingPage /></RequireAuth>} />
+                    <Route path="/dashboard/website" element={<RequireAuth><WebsitePage /></RequireAuth>} />
+                    <Route path="/dashboard/profile" element={<RequireAuth><ProfilePage /></RequireAuth>} />
+
+                    {/* Placeholder routes */}
+                    <Route path="/setup/bisnis-info" element={<div className="min-h-screen flex items-center justify-center"><h1 className="text-2xl">Setup Bisnis Info</h1></div>} />
+                    <Route path="/wp-admin" element={<div className="min-h-screen flex items-center justify-center"><h1 className="text-2xl">WordPress Dashboard</h1></div>} />
+                  </Routes>
+                </Suspense>
+              </main>
+              <Footer />
+            </div>
+
+        </AuthProvider>
+      </Router>
     </ErrorBoundary>
   );
 }

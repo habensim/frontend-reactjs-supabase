@@ -44,8 +44,8 @@ export default function RegistrationPage() {
 
         // Also store pending checkout information
         if (templateId) {
-          localStorage.setItem('pendingCheckout', JSON.stringify({ templateId, optionId }));
-          console.log('Stored pending checkout:', { templateId, optionId });
+          localStorage.setItem('pendingCheckout', JSON.stringify({ templateId, optionId: option }));
+          console.log('Stored pending checkout:', { templateId, optionId: option });
         }
       } catch (e) {
         console.error('Failed to store redirect:', e);
